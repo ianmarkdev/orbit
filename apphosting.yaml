@@ -1,6 +1,7 @@
 # Firebase App Hosting. Create the secrets once with
 #   firebase apphosting:secrets:set career-va-database-url
-#   firebase apphosting:secrets:set career-va-actions-key   # e.g. `openssl rand -base64 32`
+#   firebase apphosting:secrets:set career-va-session-secret   # e.g. `openssl rand -base64 32`
+#   firebase apphosting:secrets:set career-va-actions-key      # another random value
 # and grant the backend access when prompted.
 
 runConfig:
@@ -16,6 +17,11 @@ env:
     secret: career-va-database-url
     availability: [RUNTIME]
 
+  # Signs session cookies.
+  - variable: SESSION_SECRET
+    secret: career-va-session-secret
+    availability: [RUNTIME]
+
   # Server Actions must decrypt across instances and deploys.
   - variable: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
     secret: career-va-actions-key
@@ -25,13 +31,3 @@ env:
   - variable: APP_URL
     value: https://REPLACE-ME.hosted.app
     availability: [RUNTIME]
-
-  # Firebase web config (Project settings → Your apps). Public by design.
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: REPLACE-ME
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: REPLACE-ME.firebaseapp.com
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: REPLACE-ME
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: REPLACE-ME

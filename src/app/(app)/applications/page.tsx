@@ -22,7 +22,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<'/app
                 <p className="text-sm text-muted">Save new listings with the Career Clipper extension.</p>
             </div>
 
-            <nav aria-label="Filter by stage" className="-mx-4 flex gap-1 overflow-x-auto px-4 text-sm">
+            <nav aria-label="Filter by stage" className="-mx-4 flex gap-1 overflow-x-auto px-4 text-sm [scrollbar-width:none]">
                 {[null, ...STAGES].map((option) => (
                     <Link
                         key={option ?? 'all'}

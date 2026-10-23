@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { currentActor } from '@/lib/auth/session';
 
-import { SignInButton } from './sign-in-button';
+import { SignInForm } from './sign-in-form';
 
 export const metadata: Metadata = { title: 'Sign in · Career VA' };
 
@@ -16,11 +16,9 @@ export default async function LoginPage() {
         <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-16">
             <div className="space-y-2">
                 <h1 className="text-2xl font-semibold">Career VA</h1>
-                <p className="text-sm text-muted">
-                    Sign in with the Google account that uses the same email address as your Career Engine account.
-                </p>
+                <p className="text-sm text-muted">Sign in with your Career Engine email and password.</p>
             </div>
-            <SignInButton />
+            <SignInForm />
         </main>
     );
 }

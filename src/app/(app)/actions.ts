@@ -1,12 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { STAGES, type Stage } from '@/db/schema';
 import { changeStage } from '@/lib/applications/service';
-import { SESSION_COOKIE, requireActor } from '@/lib/auth/session';
+import { endSession, requireActor } from '@/lib/auth/session';
 
 export type StageFormState = { error: string | null };
 
@@ -29,6 +28,6 @@ export async function updateStage(applicationUlid: string, _: StageFormState, fo
 }
 
 export async function signOut(): Promise<void> {
-    (await cookies()).delete(SESSION_COOKIE);
+    await endSession();
     redirect('/login');
 }

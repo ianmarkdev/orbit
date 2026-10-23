@@ -12,13 +12,14 @@ export type Actor = {
     email: string;
     workspaceId: number;
     role: Role;
+    usesTwoFactor: boolean;
 };
 
 export type ActorResult = { ok: true; actor: Actor } | { ok: false; message: string };
 
 /**
  * Career Engine's request guards, in its order: `verified` (email verified), `tenant` (active,
- * with a membership) and `candidate.two-factor` (the candidate must use 2FA). A Firebase sign-in
+ * with a membership) and `candidate.two-factor` (the candidate must use 2FA). A password check
  * or a Sanctum token only says who someone is; this decides whether they may act.
  */
 export async function resolveActor(where: { userId: number } | { email: string }): Promise<ActorResult> {
@@ -60,7 +61,14 @@ export async function resolveActor(where: { userId: number } | { email: string }
 
     return {
         ok: true,
-        actor: { userId: row.userId, name: row.name, email: row.email, workspaceId: row.workspaceId, role: row.role },
+        actor: {
+            userId: row.userId,
+            name: row.name,
+            email: row.email,
+            workspaceId: row.workspaceId,
+            role: row.role,
+            usesTwoFactor: row.twoFactorConfirmedAt !== null,
+        },
     };
 }
 
