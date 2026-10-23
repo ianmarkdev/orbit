@@ -1,0 +1,37 @@
+# Firebase App Hosting. Create the secrets once with
+#   firebase apphosting:secrets:set career-va-database-url
+#   firebase apphosting:secrets:set career-va-actions-key   # e.g. `openssl rand -base64 32`
+# and grant the backend access when prompted.
+
+runConfig:
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # Neon pooled connection string for the `career_va` role (db/career_va_role.sql), never the owner.
+  - variable: DATABASE_URL
+    secret: career-va-database-url
+    availability: [RUNTIME]
+
+  # Server Actions must decrypt across instances and deploys.
+  - variable: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+    secret: career-va-actions-key
+    availability: [BUILD, RUNTIME]
+
+  # Public origin, used in the links returned to Career Clipper.
+  - variable: APP_URL
+    value: https://REPLACE-ME.hosted.app
+    availability: [RUNTIME]
+
+  # Firebase web config (Project settings → Your apps). Public by design.
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: REPLACE-ME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: REPLACE-ME.firebaseapp.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: REPLACE-ME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: REPLACE-ME
