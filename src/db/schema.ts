@@ -48,6 +48,11 @@ export const jobApplications = pgTable('job_applications', {
     appliedAt: timestamp('applied_at', tz),
     deadlineOn: date('deadline_on', { mode: 'string' }),
     notes: text('notes'),
+    // Pending a Career Engine migration: source, subject_line, apply_requirement, proposal_angle.
+    source: text('source'),
+    subjectLine: text('subject_line'),
+    applyRequirement: text('apply_requirement').$type<ApplyRequirement>(),
+    proposalAngle: text('proposal_angle'),
     ownerUserId: bigint('owner_user_id', { mode: 'number' }),
     assignedUserId: bigint('assigned_user_id', { mode: 'number' }),
     lockVersion: integer('lock_version').notNull(),
@@ -101,3 +106,7 @@ export type Stage = (typeof STAGES)[number];
 
 export const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'freelance', 'internship', 'other'] as const;
 export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
+
+/** What a listing asks for on top of the application itself. */
+export const APPLY_REQUIREMENTS = ['video', 'test', 'video_and_test'] as const;
+export type ApplyRequirement = (typeof APPLY_REQUIREMENTS)[number];

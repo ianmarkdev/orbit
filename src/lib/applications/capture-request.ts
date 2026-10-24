@@ -1,4 +1,4 @@
-import { EMPLOYMENT_TYPES, type EmploymentType } from '@/db/schema';
+import { APPLY_REQUIREMENTS, EMPLOYMENT_TYPES, type ApplyRequirement, type EmploymentType } from '@/db/schema';
 import { characterCount, normalizePlainText } from '@/lib/plain-text';
 
 /**
@@ -6,9 +6,14 @@ import { characterCount, normalizePlainText } from '@/lib/plain-text';
  * extends). Career Clipper reads the 422 body field by field, so the pipeline, field names and
  * messages follow Laravel's: TrimStrings and ConvertEmptyStringsToNull, then PlainText
  * normalisation of the text fields, then the rules. Unknown fields are ignored.
+ *
+ * Ahead of Laravel: `source`, `subject_line`, `apply_requirement`, `proposal_angle` and `notes`
+ * are accepted here; Career Engine's request still has to gain the same rules.
  */
 
 export const MAX_JOB_DESCRIPTION_LENGTH = 50_000;
+export const MAX_PROPOSAL_ANGLE_LENGTH = 5_000;
+export const MAX_NOTES_LENGTH = 10_000;
 
 const EXTRACTION_METHODS = ['adapter', 'json-ld', 'meta', 'dom', 'fallback', 'manual'];
 const WORKPLACE_TYPES = ['remote', 'hybrid', 'on_site'];
@@ -24,6 +29,11 @@ export type ApplicationDetails = {
     employmentType: EmploymentType | null;
     salaryText: string | null;
     deadlineOn: string | null;
+    source: string | null;
+    subjectLine: string | null;
+    applyRequirement: ApplyRequirement | null;
+    proposalAngle: string | null;
+    notes: string | null;
 };
 
 export type CaptureRequest = {
@@ -85,6 +95,11 @@ export function parseCaptureRequest(body: unknown): ParsedCapture {
         fail('deadline_on', 'The deadline on field must match the format Y-m-d.');
     }
     string('job_description', input.job_description, { max: MAX_JOB_DESCRIPTION_LENGTH });
+    string('source', input.source, { max: 200 });
+    string('subject_line', input.subject_line, { max: 200 });
+    oneOf('apply_requirement', input.apply_requirement, APPLY_REQUIREMENTS);
+    string('proposal_angle', input.proposal_angle, { max: MAX_PROPOSAL_ANGLE_LENGTH });
+    string('notes', input.notes, { max: MAX_NOTES_LENGTH });
     if (input.allow_duplicate !== undefined && input.allow_duplicate !== null && toBoolean(input.allow_duplicate) === null) {
         fail('allow_duplicate', 'The allow duplicate field must be true or false.');
     }
@@ -135,7 +150,7 @@ export function parseCaptureRequest(body: unknown): ParsedCapture {
 function prepare(body: Input): Input {
     const input = trimAndNullify(body) as Input;
 
-    for (const [field, multiline] of [['company_name', false], ['role_title', false], ['location', false], ['salary_text', false], ['job_description', true]] as const) {
+    for (const [field, multiline] of [['company_name', false], ['role_title', false], ['location', false], ['salary_text', false], ['job_description', true], ['source', false], ['subject_line', false], ['proposal_angle', true], ['notes', true]] as const) {
         if (typeof input[field] === 'string') {
             const clean = normalizePlainText(input[field], multiline);
             input[field] = clean === '' ? null : clean;
@@ -178,6 +193,11 @@ function toCaptureRequest(input: Input): CaptureRequest {
             employmentType: optional(input.employment_type) as EmploymentType | null,
             salaryText: optional(input.salary_text),
             deadlineOn: optional(input.deadline_on),
+            source: optional(input.source),
+            subjectLine: optional(input.subject_line),
+            applyRequirement: optional(input.apply_requirement) as ApplyRequirement | null,
+            proposalAngle: optional(input.proposal_angle),
+            notes: optional(input.notes),
         },
         jobDescription: optional(input.job_description),
         captureMetadata: {

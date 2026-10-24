@@ -19,6 +19,12 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
     other: 'Other',
 };
 
+const APPLY_REQUIREMENT_LABELS: Record<string, string> = {
+    video: 'Video',
+    test: 'Test',
+    video_and_test: 'Video and test',
+};
+
 export default async function ApplicationPage({ params }: PageProps<'/applications/[ulid]'>) {
     const actor = await requireActor();
     const { ulid } = await params;
@@ -32,6 +38,9 @@ export default async function ApplicationPage({ params }: PageProps<'/applicatio
         ['Location', application.location],
         ['Employment', application.employmentType && EMPLOYMENT_LABELS[application.employmentType]],
         ['Salary', application.salaryText],
+        ['Source', application.source],
+        ['Subject line', application.subjectLine],
+        ['Required to apply', application.applyRequirement && APPLY_REQUIREMENT_LABELS[application.applyRequirement]],
         ['Deadline', application.deadlineOn && formatDate(application.deadlineOn)],
         ['Saved', formatDate(application.createdAt)],
         ['Applied', application.appliedAt && formatDate(application.appliedAt)],
@@ -66,6 +75,21 @@ export default async function ApplicationPage({ params }: PageProps<'/applicatio
                         </div>
                     ))}
             </dl>
+
+            {(
+                [
+                    ['Proposal angle', application.proposalAngle],
+                    ['Notes', application.notes],
+                ] as const
+            ).map(
+                ([heading, body]) =>
+                    body && (
+                        <section key={heading} className="space-y-2">
+                            <h2 className="font-medium">{heading}</h2>
+                            <div className="rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed whitespace-pre-wrap break-words">{body}</div>
+                        </section>
+                    ),
+            )}
 
             <section className="space-y-2">
                 <h2 className="font-medium">Job description</h2>
