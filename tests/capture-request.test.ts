@@ -29,7 +29,7 @@ describe('parseCaptureRequest: application extras', () => {
     });
 
     it('rejects an unknown apply requirement and over-long text', () => {
-        const parsed = parseCaptureRequest({ role_title: 'Engineer', apply_requirement: 'essay', subject_line: 'x'.repeat(201), notes: 'x'.repeat(10_001) });
+        const parsed = parseCaptureRequest({ role_title: 'Engineer', apply_requirement: 'essay', subject_line: 'x'.repeat(201), notes: 'x'.repeat(5_001) });
 
         expect(parsed.ok).toBe(false);
         expect(!parsed.ok && Object.keys(parsed.errors).sort()).toEqual(['apply_requirement', 'notes', 'subject_line']);

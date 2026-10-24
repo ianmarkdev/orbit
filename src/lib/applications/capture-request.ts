@@ -6,14 +6,11 @@ import { characterCount, normalizePlainText } from '@/lib/plain-text';
  * extends). Career Clipper reads the 422 body field by field, so the pipeline, field names and
  * messages follow Laravel's: TrimStrings and ConvertEmptyStringsToNull, then PlainText
  * normalisation of the text fields, then the rules. Unknown fields are ignored.
- *
- * Ahead of Laravel: `source`, `subject_line`, `apply_requirement`, `proposal_angle` and `notes`
- * are accepted here; Career Engine's request still has to gain the same rules.
  */
 
 export const MAX_JOB_DESCRIPTION_LENGTH = 50_000;
 export const MAX_PROPOSAL_ANGLE_LENGTH = 5_000;
-export const MAX_NOTES_LENGTH = 10_000;
+export const MAX_NOTES_LENGTH = 5_000;
 
 const EXTRACTION_METHODS = ['adapter', 'json-ld', 'meta', 'dom', 'fallback', 'manual'];
 const WORKPLACE_TYPES = ['remote', 'hybrid', 'on_site'];

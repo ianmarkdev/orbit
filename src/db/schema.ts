@@ -48,7 +48,6 @@ export const jobApplications = pgTable('job_applications', {
     appliedAt: timestamp('applied_at', tz),
     deadlineOn: date('deadline_on', { mode: 'string' }),
     notes: text('notes'),
-    // Pending a Career Engine migration: source, subject_line, apply_requirement, proposal_angle.
     source: text('source'),
     subjectLine: text('subject_line'),
     applyRequirement: text('apply_requirement').$type<ApplyRequirement>(),
