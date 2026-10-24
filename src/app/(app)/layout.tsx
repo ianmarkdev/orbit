@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
     return (
         <>
-            <header className="border-b border-border">
+            <header className="border-b border-border print:hidden">
                 <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
                     <Link href="/applications" className="font-semibold">
                         Career VA
@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     </div>
                 </div>
             </header>
-            <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+            <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 print:max-w-none print:p-0">{children}</main>
         </>
     );
 }

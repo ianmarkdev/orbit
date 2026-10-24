@@ -38,3 +38,16 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* The resume page prints as a plain A4 document whatever the screen theme. */
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+}

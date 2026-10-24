@@ -56,6 +56,9 @@ export default async function ApplicationsPage({ searchParams }: PageProps<'/app
                                 <div className="flex shrink-0 items-center gap-3 text-sm text-muted">
                                     {application.deadlineOn && <span>Due {formatDate(application.deadlineOn)}</span>}
                                     <span>Saved {formatDate(application.createdAt)}</span>
+                                    {application.reviewStatus === 'approved' && (application.stage === 'saved' || application.stage === 'preparing') && (
+                                        <span className="rounded-full bg-green-600/10 px-2 py-0.5 text-green-700 dark:text-green-400">Ready to apply</span>
+                                    )}
                                     <span className="rounded-full bg-surface px-2 py-0.5 text-foreground">{STAGE_LABELS[application.stage]}</span>
                                 </div>
                             </Link>

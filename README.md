@@ -1,6 +1,6 @@
 # Career VA
 
-The public side of Career Engine. A VA captures job listings with the Career Clipper extension and moves applications between stages. Career Engine (Laravel) stays private on your machine. The two apps share one Postgres database on Neon, which is their only connection.
+The public side of Career Engine. A VA captures job listings with the Career Clipper extension, applies on the job platform with the tailored resume and answers approved in Career Engine, and moves applications between stages, with an optional note on how they applied. Career Engine (Laravel) stays private on your machine. The two apps share one Postgres database on Neon, which is their only connection.
 
 ```
 VA browser + Career Clipper ──▶ Career VA (Next.js, Firebase App Hosting) ──career_va role──▶ Neon
@@ -12,10 +12,11 @@ VA browser + Career Clipper ──▶ Career VA (Next.js, Firebase App Hosting) 
 - **Career Engine owns the schema.** Every migration lives in Laravel. This app has no migrations and no drizzle-kit. [src/db/schema.ts](src/db/schema.ts) hand-describes only the columns this app may use. Update it by hand when a Laravel migration changes one of those tables.
 - **This app connects as `career_va`** ([db/career_va_role.sql](db/career_va_role.sql)). The role can:
   - read and capture applications, and move their stage
+  - read the tailored resume and form answers of an application (the app shows only approved versions; the resume is read from the frozen snapshot of the facts it uses)
   - read sign-in facts and Sanctum token hashes
   - append audit events
 
-  It cannot read career knowledge, claims, answers, password hashes, 2FA secrets or the audit log. It also cannot edit, assign, review or delete applications. Those stay in Career Engine.
+  It cannot read the career library (jobs, claims, skills), the answer library, AI runs, password hashes, 2FA secrets or the audit log. It also cannot edit, assign, review or delete applications. Those stay in Career Engine.
 - **Writes match Laravel's.** The code ports `JobApplicationService::capture()`/`changeStage()`, `SourceUrl`, `PlainText` and `CaptureJobApplicationRequest`, and uses the same advisory lock and audit actions. Laravel can't tell which app wrote a row. When you change one of those PHP classes, change its port in [src/lib](src/lib) and the ported tests in [tests](tests).
 
 ## Sign-in

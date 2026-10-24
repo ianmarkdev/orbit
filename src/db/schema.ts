@@ -1,5 +1,7 @@
 import { bigint, bigserial, boolean, char, date, integer, jsonb, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
+import type { ResumeDocument, ResumeFactsSnapshot } from '@/lib/resume/types';
+
 /**
  * The slice of Career Engine's schema this app may touch. Career Engine (Laravel) owns every
  * table and runs every migration; this file only describes the columns the `career_va` role is
@@ -43,7 +45,8 @@ export const jobApplications = pgTable('job_applications', {
     employmentType: text('employment_type').$type<EmploymentType>(),
     salaryText: text('salary_text'),
     stage: text('stage').$type<Stage>().notNull(),
-    reviewStatus: text('review_status').notNull(),
+    reviewStatus: text('review_status').$type<ReviewStatus>().notNull(),
+    reviewNote: text('review_note'),
     stageChangedAt: timestamp('stage_changed_at', tz),
     appliedAt: timestamp('applied_at', tz),
     deadlineOn: date('deadline_on', { mode: 'string' }),
@@ -71,6 +74,54 @@ export const jobPostings = pgTable('job_postings', {
     capturedAt: timestamp('captured_at', tz),
 });
 
+/** The resume tailored for one application. Only the approved version is shown here. */
+export const applicationResumes = pgTable('application_resumes', {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    workspaceId: bigint('workspace_id', { mode: 'number' }).notNull(),
+    jobApplicationId: bigint('job_application_id', { mode: 'number' }).notNull(),
+    status: text('status').$type<'draft' | 'approved'>().notNull(),
+    approvedVersionId: bigint('approved_version_id', { mode: 'number' }),
+    approvedAt: timestamp('approved_at', tz),
+});
+
+/** Append-only. `facts_snapshot` holds the library facts the document points at, as approved. */
+export const applicationResumeVersions = pgTable('application_resume_versions', {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    workspaceId: bigint('workspace_id', { mode: 'number' }).notNull(),
+    applicationResumeId: bigint('application_resume_id', { mode: 'number' }).notNull(),
+    document: jsonb('document').$type<ResumeDocument>().notNull(),
+    factsSnapshot: jsonb('facts_snapshot').$type<ResumeFactsSnapshot>().notNull(),
+});
+
+/** The questions of one application form, in form order. The cover letter is a question too. */
+export const applicationQuestions = pgTable('application_questions', {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    workspaceId: bigint('workspace_id', { mode: 'number' }).notNull(),
+    jobApplicationId: bigint('job_application_id', { mode: 'number' }).notNull(),
+    origin: text('origin').$type<QuestionOrigin>().notNull(),
+    promptText: text('prompt_text').notNull(),
+    wordLimit: integer('word_limit'),
+    charLimit: integer('char_limit'),
+    position: integer('position').notNull(),
+});
+
+export const answerDrafts = pgTable('answer_drafts', {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    workspaceId: bigint('workspace_id', { mode: 'number' }).notNull(),
+    applicationQuestionId: bigint('application_question_id', { mode: 'number' }).notNull(),
+    status: text('status').$type<'draft' | 'approved'>().notNull(),
+    approvedVersionId: bigint('approved_version_id', { mode: 'number' }),
+    approvedAt: timestamp('approved_at', tz),
+});
+
+/** Append-only. */
+export const answerDraftVersions = pgTable('answer_draft_versions', {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    workspaceId: bigint('workspace_id', { mode: 'number' }).notNull(),
+    answerDraftId: bigint('answer_draft_id', { mode: 'number' }).notNull(),
+    body: text('body').notNull(),
+});
+
 /** Append-only. `career_va` may insert but not read. */
 export const auditEvents = pgTable('audit_events', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
@@ -96,9 +147,13 @@ export const personalAccessTokens = pgTable('personal_access_tokens', {
     updatedAt: timestamp('updated_at', tz),
 });
 
-// Mirrors App\Domain\Tenancy\Role, ApplicationStage and Knowledge\EmploymentType. The database
-// CHECK constraints are the source of truth.
+// Mirrors App\Domain\Tenancy\Role, ApplicationStage, ReviewStatus and Knowledge\EmploymentType.
+// The database CHECK constraints are the source of truth.
 export type Role = 'candidate' | 'va';
+
+export type ReviewStatus = 'not_started' | 'in_progress' | 'in_review' | 'changes_requested' | 'approved';
+
+export type QuestionOrigin = 'manual' | 'cover_letter' | 'extracted';
 
 export const STAGES = ['saved', 'preparing', 'applied', 'interviewing', 'offer', 'rejected', 'withdrawn'] as const;
 export type Stage = (typeof STAGES)[number];

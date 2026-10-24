@@ -3,10 +3,11 @@
 --   psql "$OWNER_DATABASE_URL" -v password="'...'" -f db/career_va_role.sql
 -- Re-run the GRANT section after a Career Engine migration adds a column this app needs.
 --
--- Least privilege: the VA app can read and capture applications, move their stage, read its
--- users' sign-in facts and Sanctum token hashes, check a password, and append audit events.
--- It cannot read career knowledge, claims, answers, AI runs, password hashes, 2FA secrets or
--- the audit log.
+-- Least privilege: the VA app can read and capture applications, move their stage, read the
+-- tailored resume and answers prepared for an application, read its users' sign-in facts and
+-- Sanctum token hashes, check a password, and append audit events. It cannot read the career
+-- library, the answer library, AI runs, password hashes, 2FA secrets or the audit log. A tailored
+-- resume is read from the frozen snapshot of the facts it uses, never from the library.
 
 CREATE ROLE career_va LOGIN PASSWORD :password;
 ALTER ROLE career_va SET statement_timeout = '15s';
@@ -29,6 +30,14 @@ GRANT SELECT, INSERT ON job_applications TO career_va;
 GRANT UPDATE (stage, stage_changed_at, applied_at, lock_version, updated_at) ON job_applications TO career_va;
 GRANT SELECT, INSERT ON job_postings TO career_va;
 GRANT INSERT ON audit_events TO career_va;
+
+-- What the VA applies with: the tailored resume and the form answers. The app shows only the
+-- approved versions; edits, AI work and approval stay in Career Engine.
+GRANT SELECT (id, workspace_id, job_application_id, status, approved_version_id, approved_at) ON application_resumes TO career_va;
+GRANT SELECT (id, workspace_id, application_resume_id, document, facts_snapshot) ON application_resume_versions TO career_va;
+GRANT SELECT (id, workspace_id, job_application_id, origin, prompt_text, word_limit, char_limit, position) ON application_questions TO career_va;
+GRANT SELECT (id, workspace_id, application_question_id, status, approved_version_id, approved_at) ON answer_drafts TO career_va;
+GRANT SELECT (id, workspace_id, answer_draft_id, body) ON answer_draft_versions TO career_va;
 
 GRANT USAGE ON SEQUENCE job_applications_id_seq, job_postings_id_seq, audit_events_id_seq TO career_va;
 

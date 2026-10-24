@@ -6,7 +6,18 @@ import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 
 import { db, type Tx } from '@/db';
-import { candidateProfiles, jobApplications, jobPostings, type Stage } from '@/db/schema';
+import {
+    answerDrafts,
+    answerDraftVersions,
+    applicationQuestions,
+    applicationResumes,
+    applicationResumeVersions,
+    candidateProfiles,
+    jobApplications,
+    jobPostings,
+    type QuestionOrigin,
+    type Stage,
+} from '@/db/schema';
 import { recordAudit } from '@/lib/audit';
 import type { Actor } from '@/lib/auth/actor';
 import { sourceUrlKey } from '@/lib/source-url';
@@ -73,8 +84,11 @@ export async function captureApplication(actor: Actor, request: CaptureRequest, 
 /**
  * Any stage can move to any other. The first move to a submitted stage records when the
  * application was sent. Deleted applications cannot be moved (JobApplicationPolicy::update).
+ *
+ * The VA's note (how they applied, a reference number…) goes in the audit event, which Career
+ * Engine's activity timeline shows. A note without a stage change is recorded on its own.
  */
-export async function changeStage(actor: Actor, applicationUlid: string, stage: Stage): Promise<'changed' | 'unchanged' | 'not_found'> {
+export async function changeStage(actor: Actor, applicationUlid: string, stage: Stage, note: string | null = null): Promise<'changed' | 'noted' | 'unchanged' | 'not_found'> {
     return db.transaction(async (tx) => {
         const [application] = await tx
             .select({ id: jobApplications.id, stage: jobApplications.stage, appliedAt: jobApplications.appliedAt })
@@ -87,7 +101,13 @@ export async function changeStage(actor: Actor, applicationUlid: string, stage: 
         }
 
         if (application.stage === stage) {
-            return 'unchanged';
+            if (note === null) {
+                return 'unchanged';
+            }
+
+            await recordAudit(tx, actor, 'application.noted', { type: 'job_application', id: application.id }, { note });
+
+            return 'noted';
         }
 
         await tx
@@ -101,7 +121,11 @@ export async function changeStage(actor: Actor, applicationUlid: string, stage: 
             })
             .where(eq(jobApplications.id, application.id));
 
-        await recordAudit(tx, actor, 'application.stage_changed', { type: 'job_application', id: application.id }, { from: application.stage, to: stage });
+        await recordAudit(tx, actor, 'application.stage_changed', { type: 'job_application', id: application.id }, {
+            from: application.stage,
+            to: stage,
+            ...(note === null ? {} : { note }),
+        });
 
         return 'changed';
     });
@@ -116,6 +140,7 @@ export async function listApplications(actor: Actor, stage: Stage | null) {
             location: jobApplications.location,
             sourceUrl: jobApplications.sourceUrl,
             stage: jobApplications.stage,
+            reviewStatus: jobApplications.reviewStatus,
             deadlineOn: jobApplications.deadlineOn,
             createdAt: jobApplications.createdAt,
         })
@@ -148,6 +173,8 @@ export async function findApplication(actor: Actor, applicationUlid: string) {
             proposalAngle: jobApplications.proposalAngle,
             notes: jobApplications.notes,
             stage: jobApplications.stage,
+            reviewStatus: jobApplications.reviewStatus,
+            reviewNote: jobApplications.reviewNote,
             appliedAt: jobApplications.appliedAt,
             deadlineOn: jobApplications.deadlineOn,
             createdAt: jobApplications.createdAt,
@@ -168,6 +195,57 @@ export async function findApplication(actor: Actor, applicationUlid: string) {
         .limit(1);
 
     return { ...application, jobDescription: posting?.rawText ?? null };
+}
+
+export type PackAnswer = {
+    prompt: string;
+    origin: QuestionOrigin;
+    wordLimit: number | null;
+    charLimit: number | null;
+    /** The approved answer, or null while it is not approved. */
+    body: string | null;
+};
+
+/**
+ * What the VA applies with: the approved tailored resume and the approved answers, in form order
+ * with the cover letter first. Drafts are never returned: until something is approved in Career
+ * Engine it is reported as not ready.
+ */
+export async function findApplicationPack(actor: Actor, applicationId: number) {
+    const [resume] = await db
+        .select({ document: applicationResumeVersions.document, factsSnapshot: applicationResumeVersions.factsSnapshot })
+        .from(applicationResumes)
+        .innerJoin(
+            applicationResumeVersions,
+            and(eq(applicationResumeVersions.id, applicationResumes.approvedVersionId), eq(applicationResumeVersions.workspaceId, actor.workspaceId)),
+        )
+        .where(
+            and(
+                eq(applicationResumes.workspaceId, actor.workspaceId),
+                eq(applicationResumes.jobApplicationId, applicationId),
+                eq(applicationResumes.status, 'approved'),
+            ),
+        )
+        .limit(1);
+
+    const rows = await db
+        .select({
+            prompt: applicationQuestions.promptText,
+            origin: applicationQuestions.origin,
+            wordLimit: applicationQuestions.wordLimit,
+            charLimit: applicationQuestions.charLimit,
+            status: answerDrafts.status,
+            body: answerDraftVersions.body,
+        })
+        .from(applicationQuestions)
+        .leftJoin(answerDrafts, and(eq(answerDrafts.applicationQuestionId, applicationQuestions.id), eq(answerDrafts.workspaceId, actor.workspaceId)))
+        .leftJoin(answerDraftVersions, and(eq(answerDraftVersions.id, answerDrafts.approvedVersionId), eq(answerDraftVersions.workspaceId, actor.workspaceId)))
+        .where(and(eq(applicationQuestions.workspaceId, actor.workspaceId), eq(applicationQuestions.jobApplicationId, applicationId)))
+        .orderBy(sql`${applicationQuestions.origin} = 'cover_letter' DESC`, asc(applicationQuestions.position), asc(applicationQuestions.id));
+
+    const answers: PackAnswer[] = rows.map(({ status, body, ...question }) => ({ ...question, body: status === 'approved' ? body : null }));
+
+    return { resume: resume ?? null, answers };
 }
 
 /**
