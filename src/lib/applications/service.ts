@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 
-import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, not, or, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 
 import { db, type Tx } from '@/db';
@@ -20,6 +20,7 @@ import {
 } from '@/db/schema';
 import { recordAudit } from '@/lib/audit';
 import type { Actor } from '@/lib/auth/actor';
+import { OPEN_STAGES } from '@/lib/applications/readiness';
 import { sourceUrlKey } from '@/lib/source-url';
 
 import type { ApplicationDetails, CaptureRequest } from './capture-request';
@@ -131,7 +132,17 @@ export async function changeStage(actor: Actor, applicationUlid: string, stage: 
     });
 }
 
-export async function listApplications(actor: Actor, stage: Stage | null) {
+export type ReadinessFilter = 'ready' | 'not_ready' | 'changes_requested';
+
+export type ListFilters = {
+    stage: Stage | null;
+    readiness: ReadinessFilter | null;
+    /** Matched against the role title and company name. */
+    search: string | null;
+    sort: 'newest' | 'deadline';
+};
+
+export async function listApplications(actor: Actor, filters: ListFilters) {
     return db
         .select({
             ulid: jobApplications.ulid,
@@ -142,18 +153,49 @@ export async function listApplications(actor: Actor, stage: Stage | null) {
             stage: jobApplications.stage,
             reviewStatus: jobApplications.reviewStatus,
             deadlineOn: jobApplications.deadlineOn,
+            appliedAt: jobApplications.appliedAt,
             createdAt: jobApplications.createdAt,
+            resumeApproved: sql<boolean>`EXISTS (${approvedResume})`.mapWith(Boolean),
+            coverLetterTotal: questionCount(true, false),
+            coverLetterApproved: questionCount(true, true),
+            questionsTotal: questionCount(false, false),
+            questionsApproved: questionCount(false, true),
         })
         .from(jobApplications)
         .where(
             and(
                 eq(jobApplications.workspaceId, actor.workspaceId),
                 isNull(jobApplications.deletedAt),
-                stage === null ? undefined : eq(jobApplications.stage, stage),
+                filters.stage === null ? undefined : eq(jobApplications.stage, filters.stage),
+                filters.readiness === 'ready' ? and(inArray(jobApplications.stage, OPEN_STAGES), readyToApply()) : undefined,
+                filters.readiness === 'not_ready' ? and(inArray(jobApplications.stage, OPEN_STAGES), not(readyToApply())) : undefined,
+                filters.readiness === 'changes_requested' ? eq(jobApplications.reviewStatus, 'changes_requested') : undefined,
+                filters.search === null ? undefined : searchFor(filters.search),
             ),
         )
-        .orderBy(desc(jobApplications.createdAt), desc(jobApplications.id))
+        .orderBy(
+            ...(filters.sort === 'deadline' ? [sql`${jobApplications.deadlineOn} ASC NULLS LAST`] : []),
+            desc(jobApplications.createdAt),
+            desc(jobApplications.id),
+        )
         .limit(200);
+}
+
+/** How many open applications have everything approved, for the "Ready to apply" filter. */
+export async function countReadyToApply(actor: Actor): Promise<number> {
+    const [row] = await db
+        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .from(jobApplications)
+        .where(
+            and(
+                eq(jobApplications.workspaceId, actor.workspaceId),
+                isNull(jobApplications.deletedAt),
+                inArray(jobApplications.stage, OPEN_STAGES),
+                readyToApply(),
+            ),
+        );
+
+    return row?.count ?? 0;
 }
 
 export async function findApplication(actor: Actor, applicationUlid: string) {
@@ -246,6 +288,43 @@ export async function findApplicationPack(actor: Actor, applicationId: number) {
     const answers: PackAnswer[] = rows.map(({ status, body, ...question }) => ({ ...question, body: status === 'approved' ? body : null }));
 
     return { resume: resume ?? null, answers };
+}
+
+/*
+ * Readiness, correlated with the outer `job_applications` row. Mirrors findApplicationPack(): a
+ * resume or answer counts only once it is approved with an approved version.
+ */
+const approvedResume = sql`SELECT 1 FROM ${applicationResumes}
+    WHERE ${applicationResumes.jobApplicationId} = ${jobApplications.id}
+    AND ${applicationResumes.workspaceId} = ${jobApplications.workspaceId}
+    AND ${applicationResumes.status} = 'approved' AND ${applicationResumes.approvedVersionId} IS NOT NULL`;
+
+const approvedAnswer = sql`SELECT 1 FROM ${answerDrafts}
+    WHERE ${answerDrafts.applicationQuestionId} = ${applicationQuestions.id}
+    AND ${answerDrafts.workspaceId} = ${applicationQuestions.workspaceId}
+    AND ${answerDrafts.status} = 'approved' AND ${answerDrafts.approvedVersionId} IS NOT NULL`;
+
+const questionsOfApplication = sql`${applicationQuestions.jobApplicationId} = ${jobApplications.id}
+    AND ${applicationQuestions.workspaceId} = ${jobApplications.workspaceId}`;
+
+function questionCount(coverLetter: boolean, approvedOnly: boolean) {
+    return sql<number>`(SELECT count(*) FROM ${applicationQuestions}
+        WHERE ${questionsOfApplication}
+        AND (${applicationQuestions.origin} = 'cover_letter') = ${coverLetter}
+        ${approvedOnly ? sql`AND EXISTS (${approvedAnswer})` : sql``})`.mapWith(Number);
+}
+
+/** readiness.ts isReady(), in SQL so filtering happens before the LIMIT. */
+function readyToApply() {
+    return sql`(${jobApplications.reviewStatus} = 'approved'
+        AND EXISTS (${approvedResume})
+        AND NOT EXISTS (SELECT 1 FROM ${applicationQuestions} WHERE ${questionsOfApplication} AND NOT EXISTS (${approvedAnswer})))`;
+}
+
+function searchFor(search: string) {
+    const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+
+    return or(ilike(jobApplications.roleTitle, pattern), ilike(jobApplications.companyName, pattern));
 }
 
 /**

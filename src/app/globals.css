@@ -39,10 +39,14 @@ body {
   color: var(--foreground);
 }
 
-/* The resume page prints as a plain A4 document whatever the screen theme. */
+/*
+ * The resume page prints as a plain A4 document whatever the screen theme. With no page margin the
+ * browser has nowhere to draw its date, title, URL and page-number header and footer, so the
+ * resume's own print padding provides the margin instead.
+ */
 @page {
   size: A4;
-  margin: 15mm;
+  margin: 0;
 }
 
 @media print {

@@ -15,7 +15,7 @@ import type { Contact, Credential, ResumeBullet, ResumeDocument, ResumeProjectIt
  * to print on white whatever the screen theme.
  */
 export function ResumePreview({ document, contact, index }: { document: ResumeDocument; contact: Contact; index: LibraryIndex }) {
-    const contactLine = [contact.email, contact.phone, contact.location].filter(Boolean).join(' · ');
+    const contactLine = [contact.phone && `Phone: ${contact.phone}`, contact.email && `Email: ${contact.email}`].filter(Boolean).join(' | ');
     const links = resolvedLinks(document, index);
     const skillGroups = resolvedSkillGroups(document, index);
     const jobs = document.experience.filter((job) => index.employments.has(job.employment));
@@ -25,10 +25,11 @@ export function ResumePreview({ document, contact, index }: { document: ResumeDo
     const languages = resolvedLanguages(document, index);
 
     return (
-        <article className="resume space-y-5 rounded-lg border border-border bg-white p-6 text-sm leading-relaxed text-neutral-900 print:rounded-none print:border-0 print:p-0">
+        <article className="resume space-y-5 rounded-lg border border-border bg-white p-6 text-sm leading-relaxed text-neutral-900 print:rounded-none print:border-0 print:p-[15mm] print:[box-decoration-break:clone]">
             <header>
                 <h2 className="text-xl font-semibold">{contact.display_name}</h2>
                 {document.title && <p className="text-base">{document.title}</p>}
+                {contact.location && <p className="text-neutral-600">{contact.location}</p>}
                 {contactLine && <p className="text-neutral-600">{contactLine}</p>}
                 {links.length > 0 && (
                     <p className="flex flex-wrap gap-x-3 text-neutral-600">

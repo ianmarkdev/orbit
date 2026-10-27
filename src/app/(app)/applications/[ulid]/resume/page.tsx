@@ -37,7 +37,7 @@ export default async function ResumePrintPage({ params }: PageProps<'/applicatio
                 </Link>
                 <PrintButton fileName={`${contact.display_name} – ${application.roleTitle} resume`} />
             </div>
-            <p className="text-sm text-muted print:hidden">In the print dialog, choose “Save as PDF” as the destination and turn off headers and footers.</p>
+            <p className="text-sm text-muted print:hidden">In the print dialog, choose “Save as PDF” as the destination.</p>
             <ResumePreview document={resume.document} contact={contact} index={indexLibrary(library)} />
         </div>
     );

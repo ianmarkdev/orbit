@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { isReady, readinessChecks } from '@/lib/applications/readiness';
 import { findApplication, findApplicationPack } from '@/lib/applications/service';
 import { requireActor } from '@/lib/auth/session';
 import { indexLibrary, resumeToPlainText } from '@/lib/resume/document';
@@ -28,15 +29,6 @@ const APPLY_REQUIREMENT_LABELS: Record<string, string> = {
     video_and_test: 'Video and test',
 };
 
-/** ReviewStatus::label(). */
-const REVIEW_LABELS: Record<string, string> = {
-    not_started: 'Not started',
-    in_progress: 'In progress',
-    in_review: 'In review',
-    changes_requested: 'Changes requested',
-    approved: 'Approved',
-};
-
 export default async function ApplicationPage({ params }: PageProps<'/applications/[ulid]'>) {
     const actor = await requireActor();
     const { ulid } = await params;
@@ -48,7 +40,6 @@ export default async function ApplicationPage({ params }: PageProps<'/applicatio
 
     const pack = await findApplicationPack(actor, application.id);
     const resume = pack.resume && { ...pack.resume, index: indexLibrary(pack.resume.factsSnapshot.library) };
-    const approvedAnswers = pack.answers.filter((answer) => answer.body !== null).length;
 
     const facts: [string, string | null][] = [
         ['Location', application.location],
@@ -59,16 +50,17 @@ export default async function ApplicationPage({ params }: PageProps<'/applicatio
         ['Applied', application.appliedAt && formatDate(application.appliedAt)],
     ];
 
-    const checks: { label: string; done: boolean; detail: string }[] = [
-        { label: 'Review', done: application.reviewStatus === 'approved', detail: REVIEW_LABELS[application.reviewStatus] ?? application.reviewStatus },
-        { label: 'Tailored resume', done: resume !== null, detail: resume !== null ? 'Approved' : 'Not approved yet' },
-        {
-            label: 'Answers',
-            done: approvedAnswers === pack.answers.length,
-            detail: pack.answers.length === 0 ? 'No form questions' : `${approvedAnswers} of ${pack.answers.length} approved`,
-        },
-    ];
-    const ready = checks.every((check) => check.done);
+    const coverLetters = pack.answers.filter((answer) => answer.origin === 'cover_letter');
+    const questions = pack.answers.filter((answer) => answer.origin !== 'cover_letter');
+    const checks = readinessChecks({
+        reviewStatus: application.reviewStatus,
+        resumeApproved: resume !== null,
+        coverLetterTotal: coverLetters.length,
+        coverLetterApproved: coverLetters.filter((answer) => answer.body !== null).length,
+        questionsTotal: questions.length,
+        questionsApproved: questions.filter((answer) => answer.body !== null).length,
+    });
+    const ready = isReady(checks);
 
     return (
         <div className="space-y-8">
@@ -93,11 +85,11 @@ export default async function ApplicationPage({ params }: PageProps<'/applicatio
                 <h2 id="readiness" className="font-medium">
                     {ready ? 'Ready to apply' : 'Not ready to apply yet'}
                 </h2>
-                <ul className="grid gap-2 text-sm sm:grid-cols-3">
+                <ul className="grid gap-2 text-sm sm:grid-cols-4">
                     {checks.map((check) => (
-                        <li key={check.label} className="flex items-start gap-2">
-                            <span aria-hidden="true" className={check.done ? 'text-green-600' : 'text-muted'}>
-                                {check.done ? '✓' : '○'}
+                        <li key={check.key} className="flex items-start gap-2">
+                            <span aria-hidden="true" className={check.state === 'done' ? 'text-green-600' : 'text-muted'}>
+                                {check.state === 'done' ? '✓' : check.state === 'missing' ? '○' : '–'}
                             </span>
                             <span>
                                 <span className="font-medium">{check.label}</span>
