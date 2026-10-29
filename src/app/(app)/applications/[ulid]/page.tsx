@@ -7,6 +7,7 @@ import { findApplication, findApplicationPack } from '@/lib/applications/service
 import { requireActor } from '@/lib/auth/session';
 import { indexLibrary, resumeToPlainText } from '@/lib/resume/document';
 
+import { ImportantBadge } from '../../important';
 import { STAGE_LABELS, formatDate } from '../../stages';
 import { CopyButton } from './copy-button';
 import { ResumePreview } from './resume-preview';
@@ -70,6 +71,7 @@ export default async function ApplicationPage({ params }: PageProps<'/applicatio
 
             <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1">
+                    {application.isImportant && <ImportantBadge />}
                     <h1 className="text-xl font-semibold break-words">{application.roleTitle}</h1>
                     <p className="text-muted">{application.companyName ?? 'Company not named'}</p>
                     {application.sourceUrl && (

@@ -139,6 +139,8 @@ export type ListFilters = {
     readiness: ReadinessFilter | null;
     /** Matched against the role title and company name. */
     search: string | null;
+    /** Only applications flagged as important. */
+    important: boolean;
     sort: 'newest' | 'deadline';
 };
 
@@ -158,6 +160,7 @@ export async function listApplications(actor: Actor, filters: ListFilters) {
             deadlineOn: jobApplications.deadlineOn,
             appliedAt: jobApplications.appliedAt,
             createdAt: jobApplications.createdAt,
+            isImportant: jobApplications.isImportant,
             resumeApproved: sql<boolean>`EXISTS (${approvedResume})`.mapWith(Boolean),
             coverLetterTotal: questionCount(true, false),
             coverLetterApproved: questionCount(true, true),
@@ -174,6 +177,7 @@ export async function listApplications(actor: Actor, filters: ListFilters) {
                 filters.readiness === 'not_ready' ? and(inArray(jobApplications.stage, OPEN_STAGES), not(readyToApply())) : undefined,
                 filters.readiness === 'changes_requested' ? eq(jobApplications.reviewStatus, 'changes_requested') : undefined,
                 filters.search === null ? undefined : searchFor(filters.search),
+                filters.important ? eq(jobApplications.isImportant, true) : undefined,
             ),
         )
         .orderBy(
@@ -223,6 +227,7 @@ export async function findApplication(actor: Actor, applicationUlid: string) {
             appliedAt: jobApplications.appliedAt,
             deadlineOn: jobApplications.deadlineOn,
             createdAt: jobApplications.createdAt,
+            isImportant: jobApplications.isImportant,
         })
         .from(jobApplications)
         .where(and(eq(jobApplications.workspaceId, actor.workspaceId), eq(jobApplications.ulid, applicationUlid), isNull(jobApplications.deletedAt)))

@@ -6,6 +6,7 @@ import { OPEN_STAGES, isReady, missingSummary, readinessChecks, type Check } fro
 import { LIST_LIMIT, countReadyToApply, listApplications, type ListFilters, type ReadinessFilter } from '@/lib/applications/service';
 import { requireActor } from '@/lib/auth/session';
 
+import { StarIcon } from '../important';
 import { STAGE_LABELS, formatDate, formatDateTime } from '../stages';
 
 export const metadata: Metadata = { title: 'Applications · Orbit' };
@@ -19,13 +20,16 @@ const READINESS_FILTERS: { value: ReadinessFilter | null; label: string }[] = [
 
 const SORTS = { newest: 'Newest first', deadline: 'Deadline soonest' } as const;
 
+/** Important rows: an amber bar on the leading edge and a faint wash. */
+const importantRow = 'bg-amber-500/[0.06] shadow-[inset_3px_0_0_var(--color-amber-500)]';
+
 const chip = 'shrink-0 rounded-full border border-border px-3 py-1 text-muted aria-[current=page]:border-foreground aria-[current=page]:text-foreground';
 
 export default async function ApplicationsPage({ searchParams }: PageProps<'/applications'>) {
     const actor = await requireActor();
     const filters = parseFilters(await searchParams);
     const [applications, readyCount] = await Promise.all([listApplications(actor, filters), countReadyToApply(actor)]);
-    const filtered = filters.stage !== null || filters.readiness !== null || filters.search !== null || filters.sort !== 'newest';
+    const filtered = filters.stage !== null || filters.readiness !== null || filters.search !== null || filters.important || filters.sort !== 'newest';
 
     return (
         <div className="space-y-6">
@@ -49,6 +53,14 @@ export default async function ApplicationsPage({ searchParams }: PageProps<'/app
                             )}
                         </Link>
                     ))}
+                    <Link
+                        href={filterHref(filters, { important: !filters.important })}
+                        aria-current={filters.important ? 'page' : undefined}
+                        className={`${chip} inline-flex items-center gap-1`}
+                    >
+                        <StarIcon className={`size-3.5 ${filters.important ? 'text-amber-500' : ''}`} />
+                        Important
+                    </Link>
                 </nav>
 
                 <nav aria-label="Filter by stage" className="-mx-4 flex gap-1 overflow-x-auto px-4 text-sm [scrollbar-width:none]">
@@ -61,6 +73,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<'/app
 
                 <form action="/applications" className="flex flex-wrap items-center gap-2 text-sm">
                     {filters.stage && <input type="hidden" name="stage" value={filters.stage} />}
+                    {filters.important && <input type="hidden" name="important" value="1" />}
                     {filters.readiness && <input type="hidden" name="ready" value={filters.readiness} />}
                     <input
                         type="search"
@@ -103,7 +116,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<'/app
                     <ul className="divide-y divide-border rounded-lg border border-border md:hidden">
                         {applications.map((application) => (
                             <li key={application.ulid}>
-                                <Link href={`/applications/${application.ulid}`} className="block space-y-2 px-4 py-3 hover:bg-surface">
+                                <Link href={`/applications/${application.ulid}`} className={`block space-y-2 px-4 py-3 hover:bg-surface ${application.isImportant ? importantRow : ''}`}>
                                     <div className="flex items-start justify-between gap-3">
                                         <RoleCell application={application} />
                                         <StageBadge stage={application.stage} />
@@ -145,7 +158,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<'/app
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {applications.map((application) => (
-                                    <tr key={application.ulid} className="relative align-top hover:bg-surface">
+                                    <tr key={application.ulid} className={`relative align-top hover:bg-surface ${application.isImportant ? importantRow : ''}`}>
                                         <td className="max-w-0 px-4 py-3 lg:w-[34%]">
                                             {/* The link's ::after covers the row, so any cell opens the application. */}
                                             <Link href={`/applications/${application.ulid}`} className="block after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent">
@@ -183,7 +196,15 @@ type Row = Awaited<ReturnType<typeof listApplications>>[number];
 function RoleCell({ application }: { application: Row }) {
     return (
         <div className="min-w-0">
-            <p className="truncate font-medium">{application.roleTitle}</p>
+            <p className="flex items-center gap-1.5 font-medium">
+                {application.isImportant && (
+                    <span title="Important" className="text-amber-500">
+                        <StarIcon />
+                        <span className="sr-only">Important: </span>
+                    </span>
+                )}
+                <span className="truncate">{application.roleTitle}</span>
+            </p>
             <p className="truncate text-sm text-muted">{[application.companyName ?? 'Company not named', application.location].filter(Boolean).join(' · ')}</p>
         </div>
     );
@@ -294,13 +315,14 @@ function Deadline({ on }: { on: string }) {
 }
 
 function parseFilters(params: Record<string, string | string[] | undefined>): ListFilters {
-    const { stage, ready, q, sort } = params;
+    const { stage, ready, q, sort, important } = params;
     const search = typeof q === 'string' ? q.trim().slice(0, 100) : '';
 
     return {
         stage: typeof stage === 'string' && STAGES.includes(stage as Stage) ? (stage as Stage) : null,
         readiness: READINESS_FILTERS.find((option) => option.value !== null && option.value === ready)?.value ?? null,
         search: search === '' ? null : search,
+        important: important === '1',
         sort: sort === 'deadline' ? 'deadline' : 'newest',
     };
 }
@@ -313,6 +335,7 @@ function filterHref(filters: ListFilters, change: Partial<ListFilters>): string 
     if (next.readiness) query.set('ready', next.readiness);
     if (next.stage) query.set('stage', next.stage);
     if (next.search) query.set('q', next.search);
+    if (next.important) query.set('important', '1');
     if (next.sort !== 'newest') query.set('sort', next.sort);
 
     const qs = query.toString();

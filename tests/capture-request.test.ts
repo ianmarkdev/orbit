@@ -36,3 +36,28 @@ describe('parseCaptureRequest: application extras', () => {
         expect(!parsed.ok && parsed.errors.apply_requirement).toEqual(['The selected apply requirement is invalid.']);
     });
 });
+
+describe('parseCaptureRequest: important', () => {
+    it('marks the application important as Laravel reads a boolean', () => {
+        for (const value of [true, 1, '1']) {
+            const parsed = parseCaptureRequest({ role_title: 'Engineer', is_important: value });
+
+            expect(parsed.ok && parsed.value.details.isImportant).toBe(true);
+        }
+    });
+
+    it('is not important when false or left out', () => {
+        for (const body of [{ role_title: 'Engineer', is_important: false }, { role_title: 'Engineer', is_important: '0' }, { role_title: 'Engineer' }]) {
+            const parsed = parseCaptureRequest(body);
+
+            expect(parsed.ok && parsed.value.details.isImportant).toBe(false);
+        }
+    });
+
+    it('rejects anything else, as Career Engine does', () => {
+        const parsed = parseCaptureRequest({ role_title: 'Engineer', is_important: 'very' });
+
+        expect(parsed.ok).toBe(false);
+        expect(!parsed.ok && parsed.errors.is_important).toEqual(['The is important field must be true or false.']);
+    });
+});

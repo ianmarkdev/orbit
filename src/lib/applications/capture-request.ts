@@ -31,6 +31,7 @@ export type ApplicationDetails = {
     applyRequirement: ApplyRequirement | null;
     proposalAngle: string | null;
     notes: string | null;
+    isImportant: boolean;
 };
 
 export type CaptureRequest = {
@@ -99,6 +100,9 @@ export function parseCaptureRequest(body: unknown): ParsedCapture {
     string('notes', input.notes, { max: MAX_NOTES_LENGTH });
     if (input.allow_duplicate !== undefined && input.allow_duplicate !== null && toBoolean(input.allow_duplicate) === null) {
         fail('allow_duplicate', 'The allow duplicate field must be true or false.');
+    }
+    if (input.is_important !== undefined && input.is_important !== null && toBoolean(input.is_important) === null) {
+        fail('is_important', 'The is important field must be true or false.');
     }
 
     const capture = input.capture;
@@ -195,6 +199,7 @@ function toCaptureRequest(input: Input): CaptureRequest {
             applyRequirement: optional(input.apply_requirement) as ApplyRequirement | null,
             proposalAngle: optional(input.proposal_angle),
             notes: optional(input.notes),
+            isImportant: toBoolean(input.is_important) ?? false,
         },
         jobDescription: optional(input.job_description),
         captureMetadata: {
