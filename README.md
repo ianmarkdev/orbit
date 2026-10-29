@@ -1,10 +1,10 @@
-# Career VA
+# Orbit
 
 The public side of Career Engine. A VA captures job listings with the Career Clipper extension, applies on the job platform with the tailored resume and answers approved in Career Engine, and moves applications between stages, with an optional note on how they applied. Career Engine (Laravel) stays private on your machine. The two apps share one Postgres database on Neon, which is their only connection.
 
 ```
-VA browser + Career Clipper ──▶ Career VA (Next.js, Firebase App Hosting) ──career_va role──▶ Neon
-                                         Career Engine (Laravel, local) ──owner role──────────▲
+VA browser + Career Clipper ──▶ Orbit (Next.js, Vercel) ──career_va role──▶ Neon
+                               Career Engine (Laravel, local) ──owner role──▲
 ```
 
 ## Rules of the shared database
@@ -28,8 +28,8 @@ VA browser + Career Clipper ──▶ Career VA (Next.js, Firebase App Hosting) 
 
 1. **Move Career Engine to Neon.** Create the project and run `php artisan migrate` against it. Neon supports the `vector`, `pg_trgm`, `citext` and `pgcrypto` extensions needed. Try migrations on a Neon branch before running them on `main`.
 2. **Create the role:** `psql "$OWNER_URL" -v password="'…'" -f db/career_va_role.sql`. Re-run its GRANT lines after a migration this app depends on.
-3. **Firebase:** create an App Hosting backend for this directory. Firebase Auth isn't used.
-4. **Secrets and config:** set them in [apphosting.yaml](apphosting.yaml). `DATABASE_URL` is Neon's **pooled** string for `career_va`. `SESSION_SECRET` and `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` are stable random values.
+3. **Vercel:** import this directory as a Next.js project.
+4. **Environment variables** (Project → Settings → Environment Variables): `DATABASE_URL` is Neon's **pooled** string for `career_va`, never the owner. `SESSION_SECRET` is a stable random value of at least 32 characters. `APP_URL` is the production URL, the same address Career Clipper uses. `REQUIRE_CANDIDATE_TWO_FACTOR` matches Career Engine's.
 
 ## Development
 

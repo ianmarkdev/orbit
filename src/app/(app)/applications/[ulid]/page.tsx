@@ -12,7 +12,7 @@ import { CopyButton } from './copy-button';
 import { ResumePreview } from './resume-preview';
 import { StageForm } from './stage-form';
 
-export const metadata: Metadata = { title: 'Application · Career VA' };
+export const metadata: Metadata = { title: 'Application · Orbit' };
 
 const EMPLOYMENT_LABELS: Record<string, string> = {
     full_time: 'Full time',

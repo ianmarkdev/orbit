@@ -21,3 +21,11 @@ export function formatDate(value: Date | string | null): string {
 
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/**
+ * "28 Oct 2026, 14:05 UTC", for a tooltip that gives the exact moment behind a date. Pages render
+ * on the server, which runs in UTC on Vercel, so the zone is stated rather than implied.
+ */
+export function formatDateTime(value: Date): string {
+    return `${value.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC`;
+}

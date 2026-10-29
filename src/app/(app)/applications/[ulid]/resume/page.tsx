@@ -9,7 +9,7 @@ import { indexLibrary } from '@/lib/resume/document';
 import { PrintButton } from '../copy-button';
 import { ResumePreview } from '../resume-preview';
 
-export const metadata: Metadata = { title: 'Resume · Career VA' };
+export const metadata: Metadata = { title: 'Resume · Orbit' };
 
 /** The approved tailored resume on its own, for the browser's Save as PDF. */
 export default async function ResumePrintPage({ params }: PageProps<'/applications/[ulid]/resume'>) {

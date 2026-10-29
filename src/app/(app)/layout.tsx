@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <header className="border-b border-border print:hidden">
                 <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
                     <Link href="/applications" className="font-semibold">
-                        Career VA
+                        Orbit
                     </Link>
                     <div className="flex items-center gap-4 text-sm">
                         <span className="hidden text-muted sm:inline">{actor.name}</span>

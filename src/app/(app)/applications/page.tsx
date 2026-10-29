@@ -3,12 +3,12 @@ import Link from 'next/link';
 
 import { STAGES, type Stage } from '@/db/schema';
 import { OPEN_STAGES, isReady, missingSummary, readinessChecks, type Check } from '@/lib/applications/readiness';
-import { countReadyToApply, listApplications, type ListFilters, type ReadinessFilter } from '@/lib/applications/service';
+import { LIST_LIMIT, countReadyToApply, listApplications, type ListFilters, type ReadinessFilter } from '@/lib/applications/service';
 import { requireActor } from '@/lib/auth/session';
 
-import { STAGE_LABELS, formatDate } from '../stages';
+import { STAGE_LABELS, formatDate, formatDateTime } from '../stages';
 
-export const metadata: Metadata = { title: 'Applications · Career VA' };
+export const metadata: Metadata = { title: 'Applications · Orbit' };
 
 const READINESS_FILTERS: { value: ReadinessFilter | null; label: string }[] = [
     { value: null, label: 'All' },
@@ -93,56 +93,176 @@ export default async function ApplicationsPage({ searchParams }: PageProps<'/app
                     {filtered ? 'No applications match these filters.' : 'No applications yet.'}
                 </p>
             ) : (
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                    {applications.map((application) => {
-                        const open = OPEN_STAGES.includes(application.stage);
-                        const checks = readinessChecks(application);
-                        const ready = isReady(checks);
+                <div className="space-y-2">
+                    <p className="text-sm text-muted">
+                        {applications.length === LIST_LIMIT ? `Showing the first ${LIST_LIMIT}` : `${applications.length} ${applications.length === 1 ? 'application' : 'applications'}`}
+                        {` · ${filters.sort === 'deadline' ? 'deadline soonest first' : 'newest saved first'}`}
+                    </p>
 
-                        return (
+                    {/* Phones: one card per application. */}
+                    <ul className="divide-y divide-border rounded-lg border border-border md:hidden">
+                        {applications.map((application) => (
                             <li key={application.ulid}>
-                                <Link href={`/applications/${application.ulid}`} className="flex flex-col gap-2 px-4 py-3 hover:bg-surface sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                                    <div className="min-w-0 space-y-1.5">
-                                        <div>
-                                            <p className="truncate font-medium">{application.roleTitle}</p>
-                                            <p className="truncate text-sm text-muted">
-                                                {[application.companyName ?? 'Company not named', application.location].filter(Boolean).join(' · ')}
-                                            </p>
-                                        </div>
-                                        {open && (
-                                            <ul aria-label="Readiness" className="flex flex-wrap gap-1 text-xs">
-                                                {checks
-                                                    .filter((check) => check.state !== 'not_needed')
-                                                    .map((check) => (
-                                                        <CheckChip key={check.key} check={check} changesRequested={application.reviewStatus === 'changes_requested'} />
-                                                    ))}
-                                            </ul>
+                                <Link href={`/applications/${application.ulid}`} className="block space-y-2 px-4 py-3 hover:bg-surface">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <RoleCell application={application} />
+                                        <StageBadge stage={application.stage} />
+                                    </div>
+                                    <Readiness application={application} />
+                                    <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+                                        <DateItem label="Saved" value={application.createdAt} />
+                                        {application.appliedAt && <DateItem label="Applied" value={application.appliedAt} />}
+                                        {OPEN_STAGES.includes(application.stage) && application.deadlineOn && (
+                                            <div className="flex gap-1">
+                                                <dt>Deadline</dt>
+                                                <dd>
+                                                    <Deadline on={application.deadlineOn} />
+                                                </dd>
+                                            </div>
                                         )}
-                                    </div>
-                                    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted sm:flex-col sm:items-end">
-                                        {open &&
-                                            (ready ? (
-                                                <span className="rounded-full bg-green-600/10 px-2 py-0.5 font-medium text-green-700 dark:text-green-400">Ready to apply</span>
-                                            ) : (
-                                                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-400">
-                                                    Missing: {missingSummary(checks, application)}
-                                                </span>
-                                            ))}
-                                        <span className="flex items-center gap-3">
-                                            {open && application.deadlineOn && <Deadline on={application.deadlineOn} />}
-                                            <span>
-                                                {application.appliedAt ? `Applied ${formatDate(application.appliedAt)}` : `Saved ${formatDate(application.createdAt)}`}
-                                            </span>
-                                            <span className="rounded-full bg-surface px-2 py-0.5 text-foreground">{STAGE_LABELS[application.stage]}</span>
-                                        </span>
-                                    </div>
+                                    </dl>
                                 </Link>
                             </li>
-                        );
-                    })}
-                </ul>
+                        ))}
+                    </ul>
+
+                    {/* Wider screens: a table, the whole row opening the application. */}
+                    <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-surface text-xs text-muted">
+                                <tr>
+                                    <th scope="col" className="px-4 py-2 font-medium">Role</th>
+                                    <th scope="col" className="px-3 py-2 font-medium">Stage</th>
+                                    <th scope="col" className="px-3 py-2 font-medium">Readiness</th>
+                                    <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap" aria-sort={filters.sort === 'deadline' ? 'ascending' : undefined}>
+                                        <SortLink filters={filters} sort="deadline" label="Deadline" />
+                                    </th>
+                                    <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap" aria-sort={filters.sort === 'newest' ? 'descending' : undefined}>
+                                        <SortLink filters={filters} sort="newest" label="Saved" />
+                                    </th>
+                                    <th scope="col" className="px-4 py-2 font-medium whitespace-nowrap">Applied</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {applications.map((application) => (
+                                    <tr key={application.ulid} className="relative align-top hover:bg-surface">
+                                        <td className="max-w-0 px-4 py-3 lg:w-[34%]">
+                                            {/* The link's ::after covers the row, so any cell opens the application. */}
+                                            <Link href={`/applications/${application.ulid}`} className="block after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent">
+                                                <RoleCell application={application} />
+                                            </Link>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <StageBadge stage={application.stage} />
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <Readiness application={application} />
+                                        </td>
+                                        <td className="px-3 py-3 whitespace-nowrap text-muted">
+                                            {OPEN_STAGES.includes(application.stage) && application.deadlineOn ? <Deadline on={application.deadlineOn} /> : '—'}
+                                        </td>
+                                        <td className="px-3 py-3 whitespace-nowrap text-muted">
+                                            <DateCell value={application.createdAt} />
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-muted">
+                                            <DateCell value={application.appliedAt} />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             )}
         </div>
+    );
+}
+
+type Row = Awaited<ReturnType<typeof listApplications>>[number];
+
+function RoleCell({ application }: { application: Row }) {
+    return (
+        <div className="min-w-0">
+            <p className="truncate font-medium">{application.roleTitle}</p>
+            <p className="truncate text-sm text-muted">{[application.companyName ?? 'Company not named', application.location].filter(Boolean).join(' · ')}</p>
+        </div>
+    );
+}
+
+/** Not yet sent stays neutral; sent ones take the colour of how they're going. */
+const STAGE_TONES: Record<Stage, string> = {
+    saved: 'bg-surface text-foreground ring-border',
+    preparing: 'bg-amber-500/10 text-amber-800 ring-amber-500/30 dark:text-amber-300',
+    applied: 'bg-blue-500/10 text-blue-800 ring-blue-500/30 dark:text-blue-300',
+    interviewing: 'bg-violet-500/10 text-violet-800 ring-violet-500/30 dark:text-violet-300',
+    offer: 'bg-green-600/10 text-green-800 ring-green-600/30 dark:text-green-300',
+    rejected: 'bg-red-500/10 text-red-800 ring-red-500/30 dark:text-red-300',
+    withdrawn: 'bg-surface text-muted ring-border',
+};
+
+function StageBadge({ stage }: { stage: Stage }) {
+    return <span className={`inline-block shrink-0 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ${STAGE_TONES[stage]}`}>{STAGE_LABELS[stage]}</span>;
+}
+
+/** Open applications: ready, or the checks still missing. Sent ones: nothing left to prepare. */
+function Readiness({ application }: { application: Row }) {
+    if (!OPEN_STAGES.includes(application.stage)) {
+        return <span className="text-sm text-muted">—</span>;
+    }
+
+    const checks = readinessChecks(application);
+
+    if (isReady(checks)) {
+        return <span className="inline-block rounded-full bg-green-600/10 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">✓ Ready to apply</span>;
+    }
+
+    return (
+        <ul aria-label={`Missing: ${missingSummary(checks, application)}`} className="flex flex-wrap gap-1 text-xs">
+            {checks
+                .filter((check) => check.state !== 'not_needed')
+                .map((check) => (
+                    <CheckChip key={check.key} check={check} changesRequested={application.reviewStatus === 'changes_requested'} />
+                ))}
+        </ul>
+    );
+}
+
+/** A date with its exact time on hover, or a dash when there is none. */
+function DateCell({ value }: { value: Date | null }) {
+    if (value === null) {
+        return '—';
+    }
+
+    return (
+        <time dateTime={value.toISOString()} title={formatDateTime(value)}>
+            {formatDate(value)}
+        </time>
+    );
+}
+
+function DateItem({ label, value }: { label: string; value: Date | null }) {
+    return (
+        <div className="flex gap-1">
+            <dt>{label}</dt>
+            <dd className="text-foreground">
+                <DateCell value={value} />
+            </dd>
+        </div>
+    );
+}
+
+/** A column heading that switches the list to its order, keeping the other filters. */
+function SortLink({ filters, sort, label }: { filters: ListFilters; sort: ListFilters['sort']; label: string }) {
+    const active = filters.sort === sort;
+
+    return (
+        <Link href={filterHref(filters, { sort })} className={`inline-flex items-center gap-1 ${active ? 'text-foreground' : 'hover:text-foreground'}`}>
+            {label}
+            {/* An SVG, not ↑/↓: Windows draws those arrows from its colour emoji font. */}
+            <svg aria-hidden="true" viewBox="0 0 12 12" className={`size-3 ${active ? '' : 'opacity-0'} ${sort === 'newest' ? 'rotate-180' : ''}`}>
+                <path d="M6 2.5v7M3 5.5l3-3 3 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </Link>
     );
 }
 

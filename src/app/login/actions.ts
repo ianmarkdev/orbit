@@ -39,9 +39,9 @@ export async function signIn(_: SignInState, form: FormData): Promise<SignInStat
         return { error: actor.message, email };
     }
 
-    // Career VA cannot ask for a 2FA code, so an account protected by one signs in to Career Engine only.
+    // Orbit cannot ask for a 2FA code, so an account protected by one signs in to Career Engine only.
     if (actor.actor.usesTwoFactor) {
-        return { error: 'This account uses two-factor authentication, which Career VA does not support. Use Career Engine instead.', email };
+        return { error: 'This account uses two-factor authentication, which Orbit does not support. Use Career Engine instead.', email };
     }
 
     await startSession(userId);

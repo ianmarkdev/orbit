@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: 'Career VA',
+    title: 'Orbit',
     description: 'Capture job listings and track application stages for Career Engine.',
     robots: { index: false, follow: false },
 };

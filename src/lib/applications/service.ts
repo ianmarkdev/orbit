@@ -142,6 +142,9 @@ export type ListFilters = {
     sort: 'newest' | 'deadline';
 };
 
+/** The most rows the list shows at once. */
+export const LIST_LIMIT = 200;
+
 export async function listApplications(actor: Actor, filters: ListFilters) {
     return db
         .select({
@@ -178,7 +181,7 @@ export async function listApplications(actor: Actor, filters: ListFilters) {
             desc(jobApplications.createdAt),
             desc(jobApplications.id),
         )
-        .limit(200);
+        .limit(LIST_LIMIT);
 }
 
 /** How many open applications have everything approved, for the "Ready to apply" filter. */
